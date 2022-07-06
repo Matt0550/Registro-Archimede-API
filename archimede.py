@@ -30,6 +30,7 @@ class Api:
         # Set cookies
         self.session.cookies = cj
         br.close()
+        print("Logged in!")
     
     def checkSession(self):
         URL = "https://accesso.registroarchimede.it/archimede/home.seam"
