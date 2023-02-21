@@ -3,8 +3,9 @@ import re
 from bs4 import BeautifulSoup
 import mechanize
 import http.cookiejar as cookielib 
+import json
 
-class Api:
+class RegistroArchimede:
     
     def __init__(self, username, password):
         self.session = requests.session()
@@ -47,6 +48,39 @@ class Api:
         else:
             return True
 
+    def getCourses(self):
+        if self.checkSession():
+            URL = "https://accesso.registroarchimede.it/archimede/alunno/riepilogoAlunno.seam"
+            # Make a post request with session cookies and set the form data 
+            # Send this form-data: controlli=controlli&controlli%3ArichTabAlunni-value=altro&controlli%3Aj_idt1197-value=compiti&controlli%3Aj_idt1372%3Aj_idt1380=&controlli%3Aj_idt1385%3Aj_idt1393=&javax.faces.ViewState=-568405570646838870%3A7108227403591799982&controlli%3Aj_idt1197=compiti&controlli%3Aj_idt1198=controlli%3Aj_idt1198&incId=1
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+            data = {
+                "controlli": "controlli",
+                "controlli%3ArichTabAlunni-value": "altro",
+                "controlli%3Aj_idt1197-value": "compiti",
+                "javax.faces.ViewState": "-568405570646838870%3A7108227403591799982",
+            }
+            result = self.session.post(URL, headers=headers, data=data, cookies=self.cookies)
+
+            print(result.content)
+
+            soup = BeautifulSoup(result.content, "html.parser")
+            # Find all <tr> with class "rf-dt-r"
+            trs = soup.find_all("tr", class_="rf-dt-r")
+            # In a dict get the name of the course, the teacher and the corsoId (inside an <a> tag, inside the <td> tag)
+            coursesNames = [tr.find("td", class_="rf-dt-c").text for tr in trs]
+            coursesTeachers = [tr.find("td", class_="rf-dt-c").find_next_sibling("td").text for tr in trs]
+            coursesIds = [tr.find("td", class_="rf-dt-c").find_next_sibling("td").find_next_sibling("td").text for tr in trs]
+            
+            # Combine coursesNames, coursesTeachers and coursesIds. Example:
+            # {["Matematica", "Prof. Rossi", "123456"], ["Italiano", "Prof. Bianchi", "654321"]}
+            courses = list(zip(coursesNames, coursesTeachers, coursesIds))
+            # Convert to json
+            courses = json.dumps(courses)
+
+            return(courses)
     
     def getHomework(self, corsoId):
         if self.checkSession():
@@ -66,6 +100,11 @@ class Api:
             # Combine dates and tr_text. Example:
             # {["21/12", "Compito di prova"], ["21/12", "Compito di prova"]}
             homework = list(zip(dates, tr_text))
+
+            # Convert to json
+            # Remove \ after characters like "
+            homework = json.dumps(homework, ensure_ascii=True)
+
             return(homework)
 
     def getSchoolGrades(self):

@@ -5,8 +5,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from archimede import Api
-api = Api("<username>", "<password>")
+from archimede import RegistroArchimede
+registroArchimede = RegistroArchimede("<username>", "<password>")
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["2/5seconds", "10/minute"])
 app = FastAPI()
@@ -26,4 +26,4 @@ app.add_middleware(SlowAPIMiddleware)
 
 @app.get("/getHomework/{corsoId}")
 def getHomework(request: Request, corsoId: str):
-    return api.getHomework(corsoId)
+    return registroArchimede.getHomework(corsoId)
