@@ -12,6 +12,8 @@ class RegistroArchimede:
         self.cookies = self.session.cookies
         self.username = username
         self.password = password
+        self.cid = None
+        self.controlli = None
         self.login(username, password)
 
     def login(self, username, password):
@@ -30,6 +32,15 @@ class RegistroArchimede:
         br.submit()
         # Set cookies
         self.session.cookies = cj
+        # Get cid from url ?cid=...
+        self.cid = re.search("\?cid=(.*)", br.geturl()).group(1)
+        # From div with flass rf-p-b get the next next sibling that have controlli:j_id
+        soup = BeautifulSoup(br.response().read(), "html.parser")
+        # Get the second div with class "rf-p-b" and get child div that has id "controlli:j_id*"
+        self.controlli = soup.find_all("div", class_="rf-p-b")[1].find("div", id=re.compile("controlli:j_id.*")).get("id")
+        
+        print(self.controlli)
+        
         br.close()
         print("Logged in!")
     
@@ -38,21 +49,29 @@ class RegistroArchimede:
         # Make a get request with session cookies
         result = self.session.get(URL, cookies=self.cookies)
         # If not redirected to login page, session is valid
+
         # From result.url, remove all from ?cid
         checkurl = result.url = re.sub("\?cid=.*", "", result.url)
 
         if checkurl == "https://accesso.registroarchimede.it/archimede/login.seam":
-            #self.login(self.username, self.password)
             self.login(self.username, self.password)
             return False
         else:
             return True
 
+    # # Get "pagella"
+    # def getSchoolReport(self):
+    #     if self.checkSession():
+    #         print(self.cid)
+    #         URL = "https://accesso.registroarchimede.it/archimede/pagelle/superiore/docValutazione.pdf?docId=1&cid=" + self.cid
+    #         # Make a get request with session cookies
+    #         result = self.session.get(URL, cookies=self.cookies)
+    #         return result.content
+
+
     def getCourses(self):
         if self.checkSession():
             URL = "https://accesso.registroarchimede.it/archimede/alunno/riepilogoAlunno.seam"
-            # Make a post request with session cookies and set the form data 
-            # Send this form-data: controlli=controlli&controlli%3ArichTabAlunni-value=altro&controlli%3Aj_idt1197-value=compiti&controlli%3Aj_idt1372%3Aj_idt1380=&controlli%3Aj_idt1385%3Aj_idt1393=&javax.faces.ViewState=-568405570646838870%3A7108227403591799982&controlli%3Aj_idt1197=compiti&controlli%3Aj_idt1198=controlli%3Aj_idt1198&incId=1
             headers = {
                 "Content-Type": "application/x-www-form-urlencoded"
             }
