@@ -34,12 +34,6 @@ class RegistroArchimede:
         self.session.cookies = cj
         # Get cid from url ?cid=...
         self.cid = re.search("\?cid=(.*)", br.geturl()).group(1)
-        # From div with flass rf-p-b get the next next sibling that have controlli:j_id
-        soup = BeautifulSoup(br.response().read(), "html.parser")
-        # Get the second div with class "rf-p-b" and get child div that has id "controlli:j_id*"
-        self.controlli = soup.find_all("div", class_="rf-p-b")[1].find("div", id=re.compile("controlli:j_id.*")).get("id")
-        
-        print(self.controlli)
         
         br.close()
         print("Logged in!")
@@ -68,24 +62,141 @@ class RegistroArchimede:
     #         result = self.session.get(URL, cookies=self.cookies)
     #         return result.content
 
+    def getStudentProfile(self):
+        URL = "https://accesso.registroarchimede.it/archimede/alunno/riepilogoAlunno.seam"
+
+        # Make a get request with session cookies
+        result = self.session.get(URL, cookies=self.cookies)
+        soup = BeautifulSoup(result.content, "html.parser")
+
+        # get the first rf-p-b 
+        div = soup.find("div", class_="rf-p-b")
+        # Get all class valori
+        valori = div.find_all("td", class_="valori")
+        
+        studentName = valori[0].text
+        studentClass = valori[2].text
+        studentAddess = valori[3].text
+        studentSchoolYear = valori[4].text
+
+        # Replace \n with space
+        studentName = studentName.replace("\n", " ")
+        studentClass = studentClass.replace("\n", " ")
+        studentAddess = studentAddess.replace("\n", " ")
+        studentSchoolYear = studentSchoolYear.replace("\n", " ")
+
+        # Jsonify
+        studentProfile = json.dumps({
+            "name": studentName,
+            "class": studentClass,
+            "address": studentAddess,
+            "schoolYear": studentSchoolYear
+        })
+
+        return studentProfile
+
+    def getSchoolMessages(self):
+        URL = "https://accesso.registroarchimede.it/archimede/circolari/CircolareListProf.seam"
+
+        # Make a get request with session cookies
+        result = self.session.get(URL, cookies=self.cookies)
+        soup = BeautifulSoup(result.content, "html.parser")
+
+        # Get trs
+        trs = soup.find_all("tr", class_="ui-widget-content")
+        dates = [tr.find_all("td")[1].text for tr in trs]
+        objects = [tr.find_all("td")[2].text for tr in trs]
+        senders = [tr.find_all("td")[3].text for tr in trs]
+
+        # Replace \n with space
+        dates = [date.replace("\n", " ") for date in dates]
+        objects = [object.replace("\n", " ") for object in objects]
+        senders = [sender.replace("\n", " ") for sender in senders]
+        
+        # Merge all lists. Key is the data and value is an array containing all messages for that date containing object and sender
+        schoolMessages = {}
+        for i in range(len(dates)):
+            if dates[i] not in schoolMessages:
+                schoolMessages[dates[i]] = []
+            schoolMessages[dates[i]].append({
+                "object": objects[i],
+                "sender": senders[i]
+            })
+
+        # Jsonify
+        schoolMessages = json.dumps(schoolMessages)
+    
+        return schoolMessages
+    
+    def getClassroomBoard(self):
+        URL = "https://accesso.registroarchimede.it/archimede/docenti/elencoDocenti.seam"
+
+        # Make a get request with session cookies
+        result = self.session.get(URL, cookies=self.cookies)
+        soup = BeautifulSoup(result.content, "html.parser")
+
+        # Get trs
+        trs = soup.find_all("tr", class_="ui-widget-content")
+
+        images = [tr.find_all("td")[0].find("img").get("src") for tr in trs]
+        subjects = [tr.find_all("td")[1].text for tr in trs]
+        teachers = [tr.find_all("td")[2].text for tr in trs]
+        coursesId = [tr.find_all("td")[3].find("a").get("href").split("=")[1].split("&")[0] for tr in trs]
+        teachersId = [tr.find_all("td")[3].find("a").get("href").split("=")[2].split("&")[0] for tr in trs]
+
+        # Replace \n with space
+        images = [image.replace("\n", " ") for image in images]
+        subjects = [subject.replace("\n", " ") for subject in subjects]
+        teachers = [teacher.replace("\n", " ") for teacher in teachers]
+
+        # Merge all lists. Index is the key
+        classroomBoard = {}
+        for i in range(len(images)):
+            classroomBoard[i] = {
+                "image": images[i],
+                "subject": subjects[i],
+                "teacher": teachers[i],
+                "courseId": coursesId[i],
+                "teacherId": teachersId[i]
+            }
+
+        # Jsonify
+        classroomBoard = json.dumps(classroomBoard)
+
+        return classroomBoard
 
     def getCourses(self):
         if self.checkSession():
             URL = "https://accesso.registroarchimede.it/archimede/alunno/riepilogoAlunno.seam"
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded"
-            }
-            data = {
-                "controlli": "controlli",
-                "controlli%3ArichTabAlunni-value": "altro",
-                "controlli%3Aj_idt1197-value": "compiti",
-                "javax.faces.ViewState": "-568405570646838870%3A7108227403591799982",
-            }
-            result = self.session.post(URL, headers=headers, data=data, cookies=self.cookies)
+            # Make a get request with session cookies
+            result = self.session.get(URL, cookies=self.cookies)
 
-            print(result.content)
 
             soup = BeautifulSoup(result.content, "html.parser")
+
+
+            # Get the first div with have the class rf-tab-cnt
+            div = soup.find("div", class_="rf-tab-cnt")
+            # Get the first div inside previous div
+            div = div.find("div").get("id")
+        
+            self.controlli = div
+
+            print(self.controlli)
+
+            # Make a post request with session cookies
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
+
+            payload='controlli=controlli&controlli%3ArichTabAlunni-value=altro&controlli%3Aj_idt164-value=alternanza'
+
+
+            result = self.session.post(URL, data=payload, cookies=self.cookies, headers=headers)
+
+            soup = BeautifulSoup(result.content, "html.parser")
+            
+
             # Find all <tr> with class "rf-dt-r"
             trs = soup.find_all("tr", class_="rf-dt-r")
             # In a dict get the name of the course, the teacher and the corsoId (inside an <a> tag, inside the <td> tag)
@@ -103,6 +214,12 @@ class RegistroArchimede:
     
     def getHomework(self, corsoId):
         if self.checkSession():
+            if corsoId == None:
+                return "Corso non trovato"
+            
+            if type(corsoId) == int:
+                corsoId = str(corsoId)
+
             URL = "https://accesso.registroarchimede.it/archimede/compiti/compitiList.seam?corsoId=" + corsoId
             # Make a get request with session cookies
             result = self.session.get(URL, cookies=self.cookies)
@@ -116,13 +233,17 @@ class RegistroArchimede:
             tr_text = [tr.find_all("td")[1].text for tr in trs]
             # Remove \n
             tr_text = [tr.replace("\n", "") for tr in tr_text]
-            # Combine dates and tr_text. Example:
-            # {["21/12", "Compito di prova"], ["21/12", "Compito di prova"]}
-            homework = list(zip(dates, tr_text))
+            # Combine dates and tr_text. If in the same date there are more than one homework, they will be in the same list
+            homeworks = {}
+
+            for i in range(len(dates)):
+                if dates[i] in homeworks:
+                    homeworks[dates[i]].append(tr_text[i])
+                else:
+                    homeworks[dates[i]] = [tr_text[i]]
 
             # Convert to json
-            # Remove \ after characters like "
-            homework = json.dumps(homework, ensure_ascii=True)
+            homework = json.dumps(homeworks)
 
             return(homework)
 
