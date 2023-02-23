@@ -195,7 +195,6 @@ class RegistroArchimede:
             result = self.session.post(URL, data=payload, cookies=self.cookies, headers=headers)
 
             soup = BeautifulSoup(result.content, "html.parser")
-            
 
             # Find all <tr> with class "rf-dt-r"
             trs = soup.find_all("tr", class_="rf-dt-r")
